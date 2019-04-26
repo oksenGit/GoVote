@@ -99,13 +99,18 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
 
         //rule table
         if($vote==1){
+            $decrypted = Crypt::decrypt($rule->votes_up)+1;
+            $encrypted =Crypt::encrypt($decrypted);
             DB::table('rules')->where('id', $rule->id)->update([
-                'votes_up'=> $rule->votes_up+1
-            ]);
+                'votes_up'=> $encrypted 
+            ]); 
+            
         }
         else{
+            $decrypted = Crypt::decrypt($rule->votes_down)+1;
+            $encrypted =Crypt::encrypt($decrypted);
             DB::table('rules')->where('id', $rule->id)->update([
-                'votes_down'=> $rule->votes_down+1
+                'votes_down'=> $encrypted
             ]);
         }
 
