@@ -41,6 +41,22 @@ Route::post('/user/login', function(Request $req){
     throw new AuthenticationException;
 });
 
+Route::middleware('auth:api')->post('rules/add', function (Request $req){
+    $user = Auth()->user();
+    $title = $req->title;
+    $desc =  $req->desc;
+    $rule = new Rule();
+    $rule->title = $title;
+    $rule->desc = $desc ;
+    $rule->user_id = $user->id ;
+    $encrypted =Crypt::encrypt(0);
+    $rule->votes_up = $encrypted;
+    $rule->votes_down = $encrypted;
+    $rule->save();
+    return $rule->fresh();
+});
+
+
 Route::middleware('auth:api')->post('user/logout', function (Request $req){
     $user = Auth()->user();
     $user->api_token = "";
@@ -124,8 +140,15 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
 });
 
 Route::get("/rules", function(Request $req){
-    return Rule::all();
+    $rules =  Rule::all();
+    foreach($rules as &$rule){
+        $rule->votes_up = Crypt::decrypt($rule->votes_up);
+        $rule->votes_down = Crypt::decrypt($rule->votes_down);
+    }
+    return $rules;
 });
+
+
 
 
 function makeJWT($user){

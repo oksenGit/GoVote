@@ -19,8 +19,8 @@ class CreateRulesTable extends Migration
             $table->timestamps();
             $table->string('title');
             $table->string('desc');
-            $table->bigInteger('votes_up');
-            $table->bigInteger('votes_down');
+            $table->string('votes_up',256);
+            $table->string('votes_down',256);
         });
     }
 
