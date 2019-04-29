@@ -41,6 +41,20 @@ Route::post('/user/login', function(Request $req){
     throw new AuthenticationException;
 });
 
+
+Route::post('/user/changePassword', function(Request $req){
+    $user = Auth::user();
+    $newPassword = $req->newPassword; 
+    if(Auth::attempt(['email'=>$user->email,'password'=>$req->password])){
+        $user->password = Hash::make($newPassword);
+        $user->api_token = "";
+        $user->save();
+        return $user;
+    }
+    throw new AuthenticationException;
+});
+
+
 Route::middleware('auth:api')->post('rules/add', function (Request $req){
     $user = Auth()->user();
     $title = $req->title;
