@@ -9,6 +9,10 @@ use Illuminate\Auth\AuthenticationException;
 use App\Rule;
 use App\Vote;
 
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token');
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
