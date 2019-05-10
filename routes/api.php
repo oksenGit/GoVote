@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Auth\AuthenticationException;
 use App\Rule;
 use App\Vote;
+use App\Option;
+use Mockery\Exception;
+use Illuminate\Support\Facades\Crypt;
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
@@ -63,14 +66,27 @@ Route::middleware('auth:api')->post('rules/add', function (Request $req){
     $user = Auth()->user();
     $title = $req->title;
     $desc =  $req->desc;
+    $start_time = $req->start_time;
+    $end_time = $req->end_time;
+    $options = $req->options;
+    $options = json_decode($options);
+
     $rule = new Rule();
     $rule->title = $title;
     $rule->desc = $desc ;
     $rule->user_id = $user->id ;
-    $encrypted =Crypt::encrypt(0);
-    $rule->votes_up = $encrypted;
-    $rule->votes_down = $encrypted;
+    $rule->start_time = $start_time;
+    $rule->end_time = $end_time;
     $rule->save();
+    $rule->fresh();
+    
+    foreach($options as $o){
+        $s = new Option();
+        $s->rule_id = $rule->id;
+        $s->name = $o;
+        $rule->options()->save($s);
+    }
+    
     return $rule->fresh();
 });
 
@@ -86,8 +102,9 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
     //Vars
     //rule_id = 15
     $rule_id = $req->rule_id;
-    //vote = 1 (-1)
-    $vote = $req->vote;
+    
+    //option_id
+    $option_id = $req->option_id;
 
     $user = Auth()->user();
 
@@ -102,6 +119,8 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
     $req->validate([
         'rule_id'=>'required|exists:rules,id',
     ]);
+
+    $options = $rule->options()->get();
     
     //lkawdlk$#lajnlla
     $rule_hash = hash("sha256",$rule->id.$rule->title.$rule->desc);
@@ -112,15 +131,26 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
 
     //check if user voted for this rule before
 
-    
-
     if(Vote::where('user_id',$user_hash)->where('rule_id',$rule_hash)->first()!==null){
         throw new Exception("User Already Voted");
     }
 
-    if($vote != 1 && $vote != -1){
-        throw new Exception("Vote can either be 1 or -1");
+    if(!Carbon::now()->isBetween(Carbon::parse($rule->start_time),Carbon::parse($rule->end_time))){
+        throw new Exception("Voting Rejected");
     }
+
+    $contaisOption = false;
+    foreach($options as $op){
+        if($op->id == $option_id){
+            $contaisOption = true;
+            break;
+        }
+    }
+
+    if($contaisOption==false){
+        throw new Exception("Option Doesn't Exist");
+    }
+
 
     //Transaction to add in Rules votes and in votes table
 
@@ -131,23 +161,23 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
             'rule_id'=>$rule_hash,
         ]);
 
-        //rule table
-        if($vote==1){
-            $decrypted = Crypt::decrypt($rule->votes_up)+1;
-            $encrypted =Crypt::encrypt($decrypted);
-            DB::table('rules')->where('id', $rule->id)->update([
-                'votes_up'=> $encrypted 
-            ]); 
-            
-        }
-        else{
-            $decrypted = Crypt::decrypt($rule->votes_down)+1;
-            $encrypted =Crypt::encrypt($decrypted);
-            DB::table('rules')->where('id', $rule->id)->update([
-                'votes_down'=> $encrypted
-            ]);
-        }
+        
+        //get option of option_id
+        //decrypt count
+        //add one to count
+        //encrypt count
+        //save
 
+
+        $option = $options->where("id",$option_id)->first();
+        $count = Crypt::decrypt($option->count);
+        $count = $count + 1;
+        $count = Crypt::encrypt($count);
+        
+        DB::table('options')->where('id', $option->id)->update([
+            'count'=>$count
+        ]);
+        
         DB::commit();
         return response()->json(["success"=>true]);
     } catch (\Exception $e) {
@@ -158,12 +188,20 @@ Route::middleware('auth:api')->post("user/vote", function(Request $req){
 });
 
 Route::get("/rules", function(Request $req){
-    $rules =  Rule::all();
-    foreach($rules as &$rule){
-        $rule->votes_up = Crypt::decrypt($rule->votes_up);
-        $rule->votes_down = Crypt::decrypt($rule->votes_down);
+    $rules =  Rule::with("options")->get();
+    $rulesList = [];
+    foreach($rules as $rule){
+        $rule = json_encode($rule);
+        $rule = json_decode($rule);//DON'T DELETE THIS PALEZ
+        if(Carbon::now()->isAfter(Carbon::parse($rule->end_time))){
+            $options = $rule->options;
+            foreach($options as &$op){
+                $op->count = Crypt::decrypt($op->count)+0;
+            }
+        }
+        array_push($rulesList, $rule);
     }
-    return $rules;
+    return $rulesList;
 });
 
 
