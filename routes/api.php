@@ -49,14 +49,16 @@ Route::post('/user/login', function(Request $req){
 });
 
 
-Route::post('/user/changePassword', function(Request $req){
+Route::middleware('auth:api')->post('/user/changePassword', function(Request $req){
     $user = Auth::user();
+    $password = $req->password;
     $newPassword = $req->newPassword; 
-    if(Auth::attempt(['email'=>$user->email,'password'=>$req->password])){
+    $isValid = Hash::check($password,$user->getAuthPassword());
+    if($isValid){
         $user->password = Hash::make($newPassword);
         $user->api_token = "";
         $user->save();
-        return $user;
+        return response()->json(["success"=>true]);
     }
     throw new AuthenticationException;
 });
